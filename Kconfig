@@ -1,0 +1,215 @@
+config ZMK_DEVICE_DETECTOR
+    bool "ZMK Device Detector Module"
+    default n
+    # Depends on ADC being enabled
+    depends on ADC
+    help
+      Enable the ZMK Device Detector module, which uses an ADC channel
+      to detect connected peripheral devices like joysticks, trackballs,
+      or encoders.
+      This module depends on ADC being enabled.
+
+if ZMK_DEVICE_DETECTOR
+
+config ZMK_DEVICE_DETECTOR_ADC_NAME
+    string "ADC Controller Device Name"
+    default "ADC_0"
+    help
+      The device tree label for the ADC controller to be used for detection.
+      Example: "ADC_0" corresponding to &adc_0 in DTS.
+
+config ZMK_DEVICE_DETECTOR_ADC_CHANNEL_ID
+    int "ADC Channel ID for Detection"
+    default 0
+    help
+      The ADC channel ID to read the detection voltage from.
+
+config ZMK_DEVICE_DETECTOR_ADC_VREF_MV
+    int "ADC Reference Voltage (mV)"
+    default 3300
+    help
+      The reference voltage of the ADC in millivolts.
+      This value MUST match the hardware configuration.
+      It is used for converting raw ADC readings to millivolt values.
+      This can be overridden by the adc-vref-mv property in DTS.
+
+config ZMK_DEVICE_DETECTOR_ADC_RESOLUTION
+    int "ADC Resolution (bits)"
+    default 10
+    help
+      The resolution of the ADC in bits (e.g., 10 or 12).
+      This value MUST match the hardware ADC capabilities.
+      It is used for converting raw ADC readings to millivolt values.
+      This can be overridden by the adc-resolution property in DTS.
+
+config ZMK_DEVICE_DETECTOR_POLL_INTERVAL_MS
+    int "Polling Interval (ms)"
+    default 100
+    help
+      Interval in milliseconds to poll the ADC for device detection.
+
+menu "Voltage Thresholds"
+
+config ZMK_DEVICE_DETECTOR_VOLTAGE_NONE_MAX_MV
+    int "Max voltage for 'No Device' (mV)"
+    default 50
+    help
+      If voltage is below or equal to this, no device is assumed.
+
+config ZMK_DEVICE_DETECTOR_VOLTAGE_JOYSTICK_MIN_MV
+    int "Min voltage for Joystick (mV)"
+    default 51
+config ZMK_DEVICE_DETECTOR_VOLTAGE_JOYSTICK_MAX_MV
+    int "Max voltage for Joystick (mV)"
+    default 800
+
+config ZMK_DEVICE_DETECTOR_VOLTAGE_TRACKBALL_MIN_MV
+    int "Min voltage for Trackball (mV)"
+    default 801
+config ZMK_DEVICE_DETECTOR_VOLTAGE_TRACKBALL_MAX_MV
+    int "Max voltage for Trackball (mV)"
+    default 1600
+
+config ZMK_DEVICE_DETECTOR_VOLTAGE_ENCODER_MIN_MV
+    int "Min voltage for Encoder (mV)"
+    default 1601
+config ZMK_DEVICE_DETECTOR_VOLTAGE_ENCODER_MAX_MV
+    int "Max voltage for Encoder (mV)"
+    default 2400
+endmenu
+
+menu "Device Handler Enables"
+
+config ZMK_DEVICE_DETECTOR_HAS_JOYSTICK
+    bool "Enable Joystick Handler"
+    default y
+    help
+      Enable detection and handling logic for joysticks.
+      Note: This enables the Kconfig options for the integrated analog input sub-driver.
+
+if ZMK_DEVICE_DETECTOR_HAS_JOYSTICK
+
+menuconfig ANALOG_INPUT
+    bool "Analog Input Sub-System for Joystick"
+    default y
+    depends on ZMK_DEVICE_DETECTOR_HAS_JOYSTICK
+    help
+      Enable the Analog Input sub-driver, used for joystick functionality
+      when a joystick is detected. This sub-driver is integrated from
+      the zmk-analog-input-driver.
+
+if ANALOG_INPUT
+
+config ANALOG_INPUT_WORKQUEUE_PRIORITY
+    int "Analog Input: Workqueue priority"
+    default 10
+    help
+      Priority of thread used by the analog input workqueue.
+
+config ANALOG_INPUT_WORKQUEUE_STACK_SIZE
+    int "Analog Input: Workqueue stack size"
+    default 1024
+    help
+      Stack size of thread used by the analog input workqueue.
+
+config ANALOG_INPUT_REPORT_INTERVAL_MIN
+    int "Analog Input: Default minimum report rate (ms)"
+    default 0
+    help
+      Default minimum report interval in milliseconds for analog input.
+      Slows down input reporting for HID queue over the air. Set to 0 to
+      report as fast as sampled if no changes (Original driver default was 22ms).
+
+config ANALOG_INPUT_LOG_DBG_RAW
+    bool "Analog Input: Debug log for RAW mV values"
+    default n
+    help
+      Enable debug logging for raw millivolt values from the analog input channels.
+
+config ANALOG_INPUT_LOG_DBG_REPORT
+    bool "Analog Input: Debug log for REPORT values"
+    default n
+    help
+      Enable debug logging for the final reported values from the analog input.
+
+choice
+    prompt "Analog Input Log level"
+    depends on LOG && ANALOG_INPUT
+    default ANALOG_INPUT_LOG_LEVEL_WRN
+    help
+      Sets the log level of the integrated Analog Input sub-driver.
+
+    config ANALOG_INPUT_LOG_LEVEL_OFF
+        bool "Off"
+    config ANALOG_INPUT_LOG_LEVEL_ERR
+        bool "Error"
+    config ANALOG_INPUT_LOG_LEVEL_WRN
+        bool "Warning"
+    config ANALOG_INPUT_LOG_LEVEL_INF
+        bool "Info"
+    config ANALOG_INPUT_LOG_LEVEL_DBG
+        bool "Debug"
+endchoice
+
+config ANALOG_INPUT_LOG_LEVEL
+    int
+    default 0 if ANALOG_INPUT_LOG_LEVEL_OFF
+    default 1 if ANALOG_INPUT_LOG_LEVEL_ERR
+    default 2 if ANALOG_INPUT_LOG_LEVEL_WRN
+    default 3 if ANALOG_INPUT_LOG_LEVEL_INF
+    default 4 if ANALOG_INPUT_LOG_LEVEL_DBG
+    depends on LOG && ANALOG_INPUT
+
+endif
+
+endif
+
+config ZMK_DEVICE_DETECTOR_HAS_TRACKBALL
+    bool "Enable Trackball Handler"
+    default y
+    help
+      Enable detection and handling logic for PMW3610 trackballs.
+      Note: Ensure the actual PMW3610 driver Kconfig (if separate) is also enabled.
+
+config ZMK_DEVICE_DETECTOR_HAS_ENCODER
+    bool "Enable Encoder Handler"
+    default y
+    # Standard ZMK EC11 Kconfig symbol
+    depends on EC11
+    help
+      Enable detection and handling logic for EC11 encoders.
+      This depends on the standard ZMK EC11 driver (CONFIG_EC11) being enabled.
+      It is a standard ZMK EC11 Kconfig symbol.
+
+endmenu
+
+# Logging for the main ZMK_DEVICE_DETECTOR module
+choice
+    prompt "ZMK Device Detector Log level"
+    depends on LOG
+    default ZMK_DEVICE_DETECTOR_LOG_LEVEL_WRN
+    help
+      Sets the log level of the ZMK Device Detector module.
+
+    config ZMK_DEVICE_DETECTOR_LOG_LEVEL_OFF
+        bool "Off"
+    config ZMK_DEVICE_DETECTOR_LOG_LEVEL_ERR
+        bool "Error"
+    config ZMK_DEVICE_DETECTOR_LOG_LEVEL_WRN
+        bool "Warning"
+    config ZMK_DEVICE_DETECTOR_LOG_LEVEL_INF
+        bool "Info"
+    config ZMK_DEVICE_DETECTOR_LOG_LEVEL_DBG
+        bool "Debug"
+endchoice
+
+config ZMK_DEVICE_DETECTOR_LOG_LEVEL
+    int
+    default 0 if ZMK_DEVICE_DETECTOR_LOG_LEVEL_OFF
+    default 1 if ZMK_DEVICE_DETECTOR_LOG_LEVEL_ERR
+    default 2 if ZMK_DEVICE_DETECTOR_LOG_LEVEL_WRN
+    default 3 if ZMK_DEVICE_DETECTOR_LOG_LEVEL_INF
+    default 4 if ZMK_DEVICE_DETECTOR_LOG_LEVEL_DBG
+    depends on LOG
+
+endif

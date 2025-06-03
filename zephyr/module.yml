@@ -1,19 +1,18 @@
 # Delete all unused properties.
 
 # Give your module a name
-name: zmk-module-template
+name: zmk-driver-device-detector
 build:
   # List your dependencies
-  depends:
-    - zmk-example-dependency
-  # Folder containing a "CMakeLists.txt" (. = root)
-  cmake: .
-  # Kconfig filepath
-  kconfig: Kconfig
+  # (Dependencies are typically handled via Kconfig symbols like ADC, LOG, etc.)
+  cmake: . # Path to CMakeLists.txt relative to this file
+  kconfig: Kconfig # Path to Kconfig file relative to this file
   settings:
-    # Folder containing a "boards" folder (. = root)
-    board_root: .
-    # Folder containing a "dts" folder (. = root)
-    dts_root: .
-    # Folder containing a "snippets" folder (. = root)
-    snippet_root:  .
+    # board_root: . # Path to 'boards' folder relative to this file
+    dts_root: . # Path to 'dts' folder (dts/bindings) relative to this file
+    # snippet_root: . # Path to 'snippets' folder relative to this file
+
+# The actual paths for cmake, kconfig, and dts_root are often specified directly
+# in the build section or are inferred if following standard Zephyr module structure.
+# Based on our current setup and common practice:
+# No 'depends' section needed here if not depending on other custom ZMK modules explicitly by name.

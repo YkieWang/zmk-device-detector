@@ -1,0 +1,104 @@
+# Copyright (c) 2024 YkieWang
+# SPDX-License-Identifier: MIT
+
+description: ZMK Device Detector
+
+compatible: "zmk,device-detector"
+
+properties:
+  label:
+    type: string
+    required: false
+    description: Human readable string describing the device (used by Zephyr for diagnostics)
+
+  adc:
+    type: phandle
+    required: true
+    description: ADC controller instance for device detection.
+
+  adc-channel:
+    type: int
+    required: true
+    description: ADC channel ID used for reading the detection voltage.
+
+  adc-vref-mv:
+    type: int
+    required: true
+    description: ADC reference voltage in millivolts (e.g., 3300 for 3.3V).
+
+  adc-resolution:
+    type: int
+    required: true
+    description: ADC resolution in bits (e.g., 10 or 12).
+
+  poll-interval-ms:
+    type: int
+    required: false
+    default: 100 # Matches Kconfig default
+    description: Interval in milliseconds to poll the ADC for device detection.
+
+  voltage-none-max-mv:
+    type: int
+    required: false
+    default: 50 # Matches Kconfig default
+    description: Maximum voltage in millivolts to be considered 'no device'.
+
+  voltage-joystick-min-mv:
+    type: int
+    required: false
+    default: 51 # Matches Kconfig default
+    description: Minimum voltage in millivolts for joystick detection.
+
+  voltage-joystick-max-mv:
+    type: int
+    required: false
+    default: 800 # Matches Kconfig default
+    description: Maximum voltage in millivolts for joystick detection.
+
+  voltage-trackball-min-mv:
+    type: int
+    required: false
+    default: 801 # Matches Kconfig default
+    description: Minimum voltage in millivolts for trackball detection.
+
+  voltage-trackball-max-mv:
+    type: int
+    required: false
+    default: 1600 # Matches Kconfig default
+    description: Maximum voltage in millivolts for trackball detection.
+
+  voltage-encoder-min-mv:
+    type: int
+    required: false
+    default: 1601 # Matches Kconfig default
+    description: Minimum voltage in millivolts for encoder detection.
+
+  voltage-encoder-max-mv:
+    type: int
+    required: false
+    default: 2400 # Matches Kconfig default
+    description: Maximum voltage in millivolts for encoder detection.
+
+  # Phandle to the EC11 sensor instance that this detector might control or report on.
+  # This allows the detector to interact with a specific encoder instance.
+  controlled-encoder:
+    type: phandle
+    required: false # It's optional; detector might just report type without direct control
+    description: PHANDLE to the EC11 sensor instance.
+
+  controlled-joystick:
+    type: phandle
+    required: false
+    description: PHANDLE to the analog input device (e.g., joystick center pin) or a related sensor node.
+
+  controlled-trackball:
+    type: phandle
+    required: false
+    description: PHANDLE to the trackball sensor instance (e.g., PMW3610).
+
+  # Placeholder for devices that might be controlled/triggered by the detector
+  # Example: if the detector enables an EC11 encoder, it might point to its instance
+  # controlled-encoders: # This is just an example, actual properties for controlled devices will vary
+  #   type: phandles
+  #   required: false
+  #   description: PHANDLES to EC11 sensor instances or other devices managed by the detector
