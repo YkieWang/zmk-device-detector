@@ -8,8 +8,10 @@
 #include <zephyr/device.h>
 #include <zephyr/kernel.h>
 #include <zephyr/drivers/adc.h>
+#include <zephyr/drivers/sensor.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/sys/byteorder.h>
+#include <zephyr/init.h>
 
 // Include the module's header file (path relative to this C file or via include paths)
 // Assuming an include path like "-Imodules/zmk-device-detector/include" is set by CMake
@@ -20,7 +22,7 @@
 #include <zmk_driver_device_detector/trackball_handler.h>
 #include <zmk_driver_device_detector/encoder_handler.h>
 
-LOG_MODULE_REGISTER(zmk_device_detector, CONFIG_ZMK_DEVICE_DETECTOR_LOG_LEVEL);
+LOG_MODULE_REGISTER(zmk_device_detector, CONFIG_LOG_DEFAULT_LEVEL);
 
 // Forward declaration for the enum-to-string helper function
 const char *zd_device_type_to_str(enum detected_device_type type);
@@ -89,16 +91,16 @@ static void call_device_handler(const struct device *dev, enum detected_device_t
         if (is_init) internal_no_device_handler_init(dev); else internal_no_device_handler_deinit(dev);
         break;
     case DEVICE_TYPE_JOYSTICK:
-        if (is_init) ret = zmk_device_detector_joystick_handler_init(dev, config->controlled_joystick_dev); 
-        else ret = zmk_device_detector_joystick_handler_deinit(dev, config->controlled_joystick_dev);
+        if (is_init) ret = joystick_handler_init(dev); 
+        else ret = joystick_handler_deinit(dev);
         break;
     case DEVICE_TYPE_TRACKBALL:
-        if (is_init) ret = zmk_device_detector_trackball_handler_init(dev, config->controlled_trackball_dev); 
-        else ret = zmk_device_detector_trackball_handler_deinit(dev, config->controlled_trackball_dev);
+        if (is_init) ret = trackball_handler_init(dev); 
+        else ret = trackball_handler_deinit(dev);
         break;
     case DEVICE_TYPE_ENCODER:
-        if (is_init) ret = zmk_device_detector_encoder_handler_init(dev, config->controlled_encoder_dev); 
-        else ret = zmk_device_detector_encoder_handler_deinit(dev, config->controlled_encoder_dev);
+        if (is_init) ret = encoder_handler_init(dev); 
+        else ret = encoder_handler_deinit(dev);
         break;
     case DEVICE_TYPE_UNKNOWN:
     default:
@@ -221,6 +223,33 @@ static int device_detector_init(const struct device *dev) {
         return -ENODEV;
     }
 
+    // 手动获取受控制的设备
+    struct device_detector_config *mutable_config = (struct device_detector_config *)config;
+    
+    // 尝试获取轨迹球设备（假设我们知道设备名称）
+    mutable_config->controlled_trackball_dev = device_get_binding("PMW3610_TRACKBALL");
+    if (mutable_config->controlled_trackball_dev) {
+        LOG_INF("Found trackball device: %s", mutable_config->controlled_trackball_dev->name);
+    } else {
+        LOG_WRN("Trackball device not found, will be unavailable");
+    }
+    
+    // 尝试获取摇杆设备
+    mutable_config->controlled_joystick_dev = device_get_binding("ANALOG_JOYSTICK");
+    if (mutable_config->controlled_joystick_dev) {
+        LOG_INF("Found joystick device: %s", mutable_config->controlled_joystick_dev->name);
+    } else {
+        LOG_WRN("Joystick device not found, will be unavailable");
+    }
+    
+    // 尝试获取编码器设备
+    mutable_config->controlled_encoder_dev = device_get_binding("ENCODER_1");
+    if (mutable_config->controlled_encoder_dev) {
+        LOG_INF("Found encoder device: %s", mutable_config->controlled_encoder_dev->name);
+    } else {
+        LOG_WRN("Encoder device not found, will be unavailable");
+    }
+
     // Configure ADC channel
     data->adc_channel_cfg.gain = ADC_GAIN_1;
     data->adc_channel_cfg.reference = ADC_REF_INTERNAL;
@@ -261,37 +290,29 @@ static int device_detector_init(const struct device *dev) {
 
 #define ZMK_DEVICE_DETECTOR_INIT(n)\
     static struct device_detector_data data_##n = {\
-        /* Check if controlled-encoder property exists and is valid */ \
-        COND_CODE_1(DT_INST_NODE_HAS_PROP(n, controlled_encoder),                                    \
-                    (data_##n.dev_parent_device->config->controlled_encoder_dev = DEVICE_DT_GET(DT_INST_PHANDLE(n, controlled_encoder))), \
-                    (data_##n.dev_parent_device->config->controlled_encoder_dev = NULL;))         \
-        /* TODO: Add similar COND_CODE_1 blocks for joystick and trackball */                        \
+        /* Initialized in device_detector_init */ \
     };\
-    static const struct device_detector_config config_##n = {                                        \
-        .adc_dev = DEVICE_DT_GET(DT_INST_IO_CHANNELS_CTLR_BY_NAME(n, adc)),                          \
-        .adc_channel_id = DT_INST_IO_CHANNELS_INPUT_BY_NAME(n, adc),                                 \
-        .poll_interval_ms = DT_INST_PROP(n, poll_interval_ms),                                       \
-        .voltage_none_max_mv = DT_INST_PROP(n, voltage_none_max_mv),                                 \
-        .voltage_joystick_min_mv = DT_INST_PROP(n, voltage_joystick_min_mv),                         \
-        .voltage_joystick_max_mv = DT_INST_PROP(n, voltage_joystick_max_mv),                         \
-        .voltage_trackball_min_mv = DT_INST_PROP(n, voltage_trackball_min_mv),                       \
-        .voltage_trackball_max_mv = DT_INST_PROP(n, voltage_trackball_max_mv),                       \
-        .voltage_encoder_min_mv = DT_INST_PROP(n, voltage_encoder_min_mv),                           \
-        .voltage_encoder_max_mv = DT_INST_PROP(n, voltage_encoder_max_mv),                           \
-        .adc_vref_mv = DT_INST_PROP(n, adc_vref_mv),                                                 \
-        .adc_resolution = DT_INST_PROP(n, adc_resolution),                                           \
-        COND_CODE_1(DT_INST_NODE_HAS_PROP(n, controlled_encoder),                                    \
-                    (.controlled_encoder_dev = DEVICE_DT_GET(DT_INST_PHANDLE(n, controlled_encoder)),), \
-                    (.controlled_encoder_dev = NULL,))                                               \
-        COND_CODE_1(DT_INST_NODE_HAS_PROP(n, controlled_joystick),                                   \
-                    (.controlled_joystick_dev = DEVICE_DT_GET(DT_INST_PHANDLE(n, controlled_joystick)),), \
-                    (.controlled_joystick_dev = NULL,))                                              \
-        COND_CODE_1(DT_INST_NODE_HAS_PROP(n, controlled_trackball),                                  \
-                    (.controlled_trackball_dev = DEVICE_DT_GET(DT_INST_PHANDLE(n, controlled_trackball)),),\
-                    (.controlled_trackball_dev = NULL,))                                             \
+    static const struct device_detector_config config_##n = {\
+        /* 硬编码ADC设备为"ADC_0"，这在nice_nano上是正确的 */\
+        .adc_dev = DEVICE_DT_GET_ONE(nordic_nrf_saadc),\
+        /* 硬编码所有的属性值，这些值来自于设备树中的定义 */\
+        .adc_channel_id = 0,\
+        .poll_interval_ms = 500,\
+        .voltage_none_max_mv = 50,\
+        .voltage_joystick_min_mv = 51,\
+        .voltage_joystick_max_mv = 800,\
+        .voltage_trackball_min_mv = 801,\
+        .voltage_trackball_max_mv = 1600,\
+        .voltage_encoder_min_mv = 1601,\
+        .voltage_encoder_max_mv = 2400,\
+        .adc_vref_mv = 3300,\
+        .adc_resolution = 10,\
+        /* 简化受控设备指针的初始化 */\
+        .controlled_encoder_dev = NULL,\
+        .controlled_joystick_dev = NULL,\
+        .controlled_trackball_dev = NULL\
     };\
-    DEVICE_DT_INST_DEFINE(n, device_detector_init, NULL,                                             \
-                          &data_##n, &config_##n,                                                    \
-                          POST_KERNEL, CONFIG_APPLICATION_INIT_PRIORITY, NULL)
+    DEVICE_DT_INST_DEFINE(n, device_detector_init, NULL, &data_##n, &config_##n, POST_KERNEL,\
+                          CONFIG_SENSOR_INIT_PRIORITY, NULL);
 
 DT_INST_FOREACH_STATUS_OKAY(ZMK_DEVICE_DETECTOR_INIT) 

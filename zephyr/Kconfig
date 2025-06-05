@@ -20,25 +20,6 @@ config ZMK_DEVICE_DETECTOR_HAS_TRACKBALL
 	select PMW3610
 	help
 	  This option enables trackball detection and handling.
-
-config ZMK_DEVICE_DETECTOR_HAS_ENCODER
-	bool "Enable rotary encoder detection support"
-	depends on ZMK_DEVICE_DETECTOR
-	depends on EC11
-	default n
-	help
-	  This option enables rotary encoder detection and handling.
-	  Note: You must also enable CONFIG_EC11=y and CONFIG_EC11_TRIGGER_GLOBAL_THREAD=y
-	  in your configuration file.
-
-config ZMK_TRACKBALL
-	bool "Enable trackball support"
-	depends on ZMK_DEVICE_DETECTOR_HAS_TRACKBALL
-	select ZMK_INPUT
-	select ZMK_POINTER_DEBOUNCE
-	default n
-	help
-	  This option enables trackball support in ZMK.
 	  
 config PMW3610
 	bool "PMW3610 optical sensor"
