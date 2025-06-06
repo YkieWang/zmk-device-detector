@@ -1,10 +1,12 @@
 menu "ZMK Device Detector"
 
 config ZMK_DEVICE_DETECTOR
-	bool "Enable Device Detector"
-	default n
+	bool "Enable ZMK Device Detector"
+	default y
 	help
-	  Enable the ZMK Device Detector module.
+	  Enable the ZMK Device Detector module to support automatic detection
+	  and management of hot-pluggable peripherals like joysticks, trackballs,
+	  and encoders.
 
 config ZMK_DEVICE_DETECTOR_LOG_LEVEL
 	int "Device Detector Log Level"

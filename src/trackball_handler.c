@@ -16,6 +16,9 @@
 
 LOG_MODULE_REGISTER(trackball_handler, CONFIG_LOG_DEFAULT_LEVEL);
 
+// 添加全局变量来跟踪轨迹球的启用状态
+static bool trackball_enabled = false;
+
 // 获取配置结构体定义（与device_detector.c中的定义一致）
 struct device_detector_config {
     const struct device *adc_dev; // ADC device pointer
@@ -35,6 +38,10 @@ struct device_detector_config {
     const struct device *controlled_encoder_dev; // Added for controlled encoder
     const struct device *controlled_joystick_dev;  // Added for joystick
     const struct device *controlled_trackball_dev; // Added for trackball
+    // 各种驱动指针
+    const struct device *joystick_dev;
+    const struct device *trackball_dev;
+    const struct device *encoder_dev;
 };
 
 /**
@@ -47,26 +54,23 @@ struct device_detector_config {
  * @return int 0 on success, or an error code on failure.
  */
 int trackball_handler_init(const struct device *dev_detector_device) {
-    if (!dev_detector_device) {
-        LOG_ERR("Device detector device is NULL");
+    LOG_INF("Initializing trackball device");
+    
+    // 获取设备检测器配置
+    const struct device_detector_config *config = dev_detector_device->config;
+    if (config == NULL) {
+        LOG_ERR("Device detector config not found");
         return -EINVAL;
     }
-    
-    // 从设备配置中直接获取轨迹球设备指针
-    const struct device_detector_config *config = dev_detector_device->config;
-    const struct device *trackball_dev = config->controlled_trackball_dev;
-    
-    if (!trackball_dev) {
-        LOG_ERR("No trackball device found in device config");
-        return -ENODEV;
+
+    if (config->trackball_dev == NULL) {
+        LOG_WRN("Trackball device not defined in device detector config");
+        // 不是错误，只是警告
     }
     
-    if (!device_is_ready(trackball_dev)) {
-        LOG_ERR("Trackball device is not ready");
-        return -ENODEV;
-    }
+    // 设置全局启用标志
+    trackball_enabled = true;
     
-    // 简化设备初始化，不使用电源管理API
     LOG_INF("Trackball device initialized successfully");
     return 0;
 }
@@ -81,21 +85,23 @@ int trackball_handler_init(const struct device *dev_detector_device) {
  * @return int 0 on success, or an error code on failure.
  */
 int trackball_handler_deinit(const struct device *dev_detector_device) {
-    if (!dev_detector_device) {
-        LOG_ERR("Device detector device is NULL");
-        return -EINVAL;
-    }
+    LOG_INF("De-initializing trackball device");
     
-    // 从设备配置中直接获取轨迹球设备指针
-    const struct device_detector_config *config = dev_detector_device->config;
-    const struct device *trackball_dev = config->controlled_trackball_dev;
+    // 清除全局启用标志
+    trackball_enabled = false;
     
-    if (!trackball_dev) {
-        LOG_ERR("No trackball device found in device config");
-        return -ENODEV;
-    }
-    
-    // 简化设备关闭，不使用电源管理API
     LOG_INF("Trackball device de-initialized successfully");
     return 0;
+}
+
+/**
+ * @brief 检查轨迹球设备是否处于活动状态
+ * 
+ * 该函数供ZMK核心代码调用，用于决定是否处理轨迹球事件
+ * 
+ * @return bool 如果轨迹球已启用返回true，否则返回false
+ */
+bool zmk_trackball_is_active(void) {
+    // 简单地返回全局状态变量
+    return trackball_enabled;
 } 

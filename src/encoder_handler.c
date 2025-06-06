@@ -11,6 +11,9 @@
 
 LOG_MODULE_REGISTER(encoder_handler, CONFIG_LOG_DEFAULT_LEVEL);
 
+// 添加全局变量来跟踪旋钮的启用状态
+static bool encoder_enabled = false;
+
 // 获取配置结构体定义（与device_detector.c中的定义一致）
 struct device_detector_config {
     const struct device *adc_dev; // ADC device pointer
@@ -28,9 +31,9 @@ struct device_detector_config {
     uint16_t adc_vref_mv;
     uint8_t adc_resolution;
     // Controlled devices
-    const struct device *controlled_joystick_dev;
-    const struct device *controlled_trackball_dev;
-    const struct device *controlled_encoder_dev;
+    const struct device *joystick_dev;
+    const struct device *trackball_dev;
+    const struct device *encoder_dev;
 };
 
 /**
@@ -45,20 +48,22 @@ struct device_detector_config {
 int encoder_handler_init(const struct device *dev_detector_device) {
     LOG_INF("Initializing encoder device");
     
+    // 获取设备检测器配置
     const struct device_detector_config *config = dev_detector_device->config;
-    
-    // 检查是否已配置旋钮设备
-    if (config->controlled_encoder_dev == NULL) {
-        LOG_ERR("No encoder device configured");
-        return -ENODEV;
+    if (config == NULL) {
+        LOG_ERR("Device detector config not found");
+        return -EINVAL;
+    }
+
+    if (config->encoder_dev == NULL) {
+        LOG_WRN("Encoder device not defined in device detector config");
+        // 不是错误，只是警告
     }
     
-    // 对于EC11旋钮，只需要确保设备已启用
-    // EC11驱动已经由ZMK内核管理，我们只需要确保设备状态正确
+    // 设置全局启用标志
+    encoder_enabled = true;
     
-    LOG_INF("Encoder device initialized successfully: %s", 
-            config->controlled_encoder_dev->name);
-    
+    LOG_INF("Encoder device initialized successfully");
     return 0;
 }
 
@@ -73,17 +78,21 @@ int encoder_handler_init(const struct device *dev_detector_device) {
 int encoder_handler_deinit(const struct device *dev_detector_device) {
     LOG_INF("De-initializing encoder device");
     
-    const struct device_detector_config *config = dev_detector_device->config;
-    
-    // 检查是否已配置旋钮设备
-    if (config->controlled_encoder_dev == NULL) {
-        LOG_ERR("No encoder device configured");
-        return -ENODEV;
-    }
-    
-    // 对于EC11旋钮，不需要特别的反初始化步骤
+    // 清除全局启用标志
+    encoder_enabled = false;
     
     LOG_INF("Encoder device de-initialized successfully");
-    
     return 0;
+}
+
+/**
+ * @brief 检查旋钮设备是否处于活动状态
+ * 
+ * 该函数供ZMK核心代码调用，用于决定是否处理旋钮事件
+ * 
+ * @return bool 如果旋钮已启用返回true，否则返回false
+ */
+bool zmk_encoder_is_active(void) {
+    // 简单地返回全局状态变量
+    return encoder_enabled;
 }
